@@ -1,86 +1,78 @@
 <?php
-require_once 'db_config.php';
-$pdo = connectDB();
+// putout_food.php
+require 'db_config.php'; // DB接続設定
 
 $message = '';
 $error_message = '';
 
-// POSTリクエスト（削除処理）
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $item_id = filter_input(INPUT_POST, 'item_id', FILTER_VALIDATE_INT);
-    $status = filter_input(INPUT_POST, 'status'); // 'Used' or 'Wasted'
-    $quantity_to_remove = filter_input(INPUT_POST, 'quantity_to_remove', FILTER_VALIDATE_INT);
-
-    if ($item_id && $status && ($status === 'Used' || $status === 'Wasted') && $quantity_to_remove > 0) {
-        $pdo->beginTransaction();
-        try {
-            // 1. 削除対象の在庫情報を取得
-            $stmt = $pdo->prepare("SELECT quantity, master_id FROM food_items WHERE id = :id");
-            $stmt->bindParam(':id', $item_id);
-            $stmt->execute();
-            $item = $stmt->fetch();
-
-            if (!$item) {
-                throw new Exception("食材が見つかりません。");
-            }
-            if ($quantity_to_remove > $item['quantity']) {
-                 throw new Exception("削除数が在庫数を超えています。");
-            }
-
-            // 2. waste_logに記録（食品ロス削減実績の算出に必要）
-            $stmt = $pdo->prepare("INSERT INTO waste_log (food_item_id, quantity, status) VALUES (:item_id, :quantity, :status)");
-            $stmt->bindParam(':item_id', $item_id);
-            $stmt->bindParam(':quantity', $quantity_to_remove);
-            $stmt->bindParam(':status', $status);
-            $stmt->execute();
-
-            // 3. food_itemsから数量を減らす
-            $new_quantity = $item['quantity'] - $quantity_to_remove;
-            // ★★★ ここから修正 ★★★
-            if ($new_quantity <= 0) {
-                // 在庫が0以下になる場合、レコードを削除する代わりに数量を0に更新する
-                // DBエラー1451を回避するため、物理削除はしない
-                $stmt = $pdo->prepare("UPDATE food_items SET quantity = 0 WHERE id = :id");
-                $stmt->bindParam(':id', $item_id);
-                $stmt->execute();
-                
-            } else {
-                // 在庫が残る場合、数量を更新
-                $stmt = $pdo->prepare("UPDATE food_items SET quantity = :quantity WHERE id = :id");
-                $stmt->bindParam(':quantity', $new_quantity);
-                $stmt->bindParam(':id', $item_id);
-                $stmt->execute();
-            }
-            // ★★★ ここまで修正 ★★★
-
-            $pdo->commit();
-            $message = $item['quantity'] > 1 && $new_quantity > 0 ? "一部をだしたよ！のこりは {$new_quantity} です。" : "たべものをだしたよ！";
-
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $error_message = "処理エラー: " . $e->getMessage();
-        }
-    } else {
-        $error_message = "入力が不正です。";
-    }
-}
-
-// 在庫一覧の取得（look_inside_refrigerato.phpと同じロジックで期限順に取得）
 try {
-    $sql = "SELECT i.*, m.name, m.unit, m.category 
-            FROM food_items i
-            JOIN food_master m ON i.master_id = m.master_id
-            -- ★★★ ここを追加 ★★★
-            WHERE i.quantity > 0 
-            -- ★★★ ここまで追加 ★★★
-            ORDER BY i.expiry_date ASC, i.registered_at ASC";
-    
+    // DB接続
+    $pdo = connectDB();
+
+    // まず在庫一覧を取得
+    $sql = "
+        SELECT fi.id, fm.name AS name, fi.quantity, fm.unit, fi.expiry_date
+        FROM food_items fi
+        JOIN food_master fm ON fi.master_id = fm.master_id
+        ORDER BY fi.expiry_date ASC
+    ";
     $stmt = $pdo->query($sql);
     $items = $stmt->fetchAll();
 
-} catch (PDOException $e) {
-    $error_message .= " | データ取得エラー: " . $e->getMessage();
+} catch (Exception $e) {
     $items = [];
+    $error_message = "在庫情報の取得に失敗しました: " . htmlspecialchars($e->getMessage());
+}
+
+// POSTで受け取った場合
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $food_item_id = isset($_POST['item_id']) ? (int)$_POST['item_id'] : 0;
+    $quantity = isset($_POST['quantity_to_remove']) ? (int)$_POST['quantity_to_remove'] : 0;
+    $status = isset($_POST['status']) ? $_POST['status'] : ''; // 'Used' or 'Wasted'
+
+    if ($food_item_id <= 0 || $quantity <= 0 || !in_array($status, ['Used','Wasted'])) {
+        $error_message = "不正なリクエストです。";
+    } else {
+        try {
+            $pdo->beginTransaction();
+
+            // ① 在庫を減らす（数量チェックも同時に）
+            $updateSql = "
+                UPDATE food_items
+                SET quantity = quantity - :quantity
+                WHERE id = :food_item_id AND quantity >= :quantity
+            ";
+            $updateStmt = $pdo->prepare($updateSql);
+            $updateStmt->execute([
+                ':quantity' => $quantity,
+                ':food_item_id' => $food_item_id
+            ]);
+
+            // ② 廃棄の場合のみ waste_log に記録
+            if ($status === 'Wasted') {
+                $logSql = "
+                    INSERT INTO waste_log (food_item_id, quantity, status, logged_at)
+                    VALUES (:food_item_id, :quantity, 'Wasted', NOW())
+                ";
+                $logStmt = $pdo->prepare($logSql);
+                $logStmt->execute([
+                    ':food_item_id' => $food_item_id,
+                    ':quantity' => $quantity
+                ]);
+            }
+
+            $pdo->commit();
+            $message = "在庫を更新しました。";
+
+            // 更新後に在庫一覧を再取得
+            $stmt = $pdo->query($sql);
+            $items = $stmt->fetchAll();
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $error_message = "エラーが発生しました：" . htmlspecialchars($e->getMessage());
+        }
+    }
 }
 ?>
 
@@ -132,7 +124,6 @@ try {
                             $today = new DateTime();
                             $interval = $today->diff($expiry_date);
                             $days_remaining = (int)$interval->format('%R%a');
-                            
                             $row_class = $days_remaining <= 7 ? 'alert-near' : '';
                             $expiry_text = $days_remaining <= 0 ? '⚠️ 期限切れ' : 'あと' . $days_remaining . '日';
                             $expiry_style = $days_remaining <= 7 ? 'class="text-danger-strong"' : '';
@@ -165,7 +156,7 @@ try {
 
     <div class="modal fade" id="removeModal" tabindex="-1" aria-labelledby="removeModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <form method="POST" class="modal-content">
+            <form method="POST" action="putout_food.php" class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeModalLabel">たべものをだす</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -180,7 +171,6 @@ try {
                             <span class="input-group-text" id="modal-unit-display"></span>
                         </div>
                         <input type="hidden" name="item_id" id="modal-item-id">
-                        <input type="hidden" id="max-quantity-limit">
                     </div>
 
                     <div class="mb-3">
@@ -209,7 +199,6 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // モーダルが表示される際に、アイテムの情報をフォームにセットするJavaScript
         document.addEventListener('DOMContentLoaded', function() {
             var removeModal = document.getElementById('removeModal');
             removeModal.addEventListener('show.bs.modal', function (event) {
@@ -219,24 +208,13 @@ try {
                 var itemUnit = button.getAttribute('data-item-unit');
                 var maxQuantity = button.getAttribute('data-max-quantity');
 
-                var modalItemName = removeModal.querySelector('#modal-item-name');
-                var modalItemId = removeModal.querySelector('#modal-item-id');
-                var modalUnitDisplay = removeModal.querySelector('#modal-unit-display');
-                var maxQuantityDisplay = removeModal.querySelector('#max-quantity-display');
+                removeModal.querySelector('#modal-item-name').textContent = itemName + ' をいくつだしますか？';
+                removeModal.querySelector('#modal-item-id').value = itemId;
+                removeModal.querySelector('#modal-unit-display').textContent = itemUnit;
+                removeModal.querySelector('#max-quantity-display').textContent = maxQuantity + ' ' + itemUnit;
                 var quantityInput = removeModal.querySelector('#quantity_to_remove');
-                
-                // フォームへの値の設定
-                modalItemName.textContent = itemName + ' をいくつだしますか？';
-                modalItemId.value = itemId;
-                modalUnitDisplay.textContent = itemUnit;
-                maxQuantityDisplay.textContent = maxQuantity + ' ' + itemUnit;
-
-                // 数量入力の最大値を設定
                 quantityInput.max = maxQuantity;
-                quantityInput.value = maxQuantity; // デフォルトで全量にする
-
-                // quantity_to_removeのmax属性を直接設定
-                quantityInput.setAttribute('max', maxQuantity);
+                quantityInput.value = maxQuantity;
             });
         });
     </script>
