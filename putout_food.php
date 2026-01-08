@@ -14,6 +14,7 @@ try {
         SELECT fi.id, fm.name AS name, fi.quantity, fm.unit, fi.expiry_date
         FROM food_items fi
         JOIN food_master fm ON fi.master_id = fm.master_id
+        WHERE fi.quantity > 0  /* ← これを追加 */
         ORDER BY fi.expiry_date ASC
     ";
     $stmt = $pdo->query($sql);
