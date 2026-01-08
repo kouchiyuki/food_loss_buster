@@ -1,79 +1,41 @@
 <?php
-// putout_food.php
-require 'db_config.php'; // DB接続設定
+session_start();
+require_once 'db_config.php';
+$pdo = connectDB();
 
-$message = '';
-$error_message = '';
-
-try {
-    // DB接続
-    $pdo = connectDB();
-
-    // まず在庫一覧を取得
-    $sql = "
-        SELECT fi.id, fm.name AS name, fi.quantity, fm.unit, fi.expiry_date
-        FROM food_items fi
-        JOIN food_master fm ON fi.master_id = fm.master_id
-        WHERE fi.quantity > 0  /* ← これを追加 */
-        ORDER BY fi.expiry_date ASC
-    ";
-    $stmt = $pdo->query($sql);
-    $items = $stmt->fetchAll();
-
-} catch (Exception $e) {
-    $items = [];
-    $error_message = "在庫情報の取得に失敗しました: " . htmlspecialchars($e->getMessage());
+// --- 1. 「だす（食べた）」処理 ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selected_items'])) {
+    try {
+        $pdo->beginTransaction();
+        
+        foreach ($_POST['selected_items'] as $id) {
+            // 在庫を0にする（または1減らすなど、運用に合わせて調整可能）
+            // 今回は「使い切った」として数量を0に更新します
+            $sql = "UPDATE food_items SET quantity = 0 WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$id]);
+        }
+        
+        $pdo->commit();
+        $message = "ごちそうさまでした！れいぞうこが スッキリしたよ。";
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $error_message = "エラーになっちゃった: " . $e->getMessage();
+    }
 }
 
-// POSTで受け取った場合
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $food_item_id = isset($_POST['item_id']) ? (int)$_POST['item_id'] : 0;
-    $quantity = isset($_POST['quantity_to_remove']) ? (int)$_POST['quantity_to_remove'] : 0;
-    $status = isset($_POST['status']) ? $_POST['status'] : ''; // 'Used' or 'Wasted'
-
-    if ($food_item_id <= 0 || $quantity <= 0 || !in_array($status, ['Used','Wasted'])) {
-        $error_message = "不正なリクエストです。";
-    } else {
-        try {
-            $pdo->beginTransaction();
-
-            // ① 在庫を減らす（数量チェックも同時に）
-            $updateSql = "
-                UPDATE food_items
-                SET quantity = quantity - :quantity
-                WHERE id = :food_item_id AND quantity >= :quantity
-            ";
-            $updateStmt = $pdo->prepare($updateSql);
-            $updateStmt->execute([
-                ':quantity' => $quantity,
-                ':food_item_id' => $food_item_id
-            ]);
-
-            // ② 廃棄の場合のみ waste_log に記録
-            if ($status === 'Wasted') {
-                $logSql = "
-                    INSERT INTO waste_log (food_item_id, quantity, status, logged_at)
-                    VALUES (:food_item_id, :quantity, 'Wasted', NOW())
-                ";
-                $logStmt = $pdo->prepare($logSql);
-                $logStmt->execute([
-                    ':food_item_id' => $food_item_id,
-                    ':quantity' => $quantity
-                ]);
-            }
-
-            $pdo->commit();
-            $message = "在庫を更新しました。";
-
-            // 更新後に在庫一覧を再取得
-            $stmt = $pdo->query($sql);
-            $items = $stmt->fetchAll();
-
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $error_message = "エラーが発生しました：" . htmlspecialchars($e->getMessage());
-        }
-    }
+// --- 2. 在庫一覧の取得 ---
+try {
+    $sql = "SELECT i.id, m.name, i.quantity, m.unit, i.expiry_date
+            FROM food_items i
+            JOIN food_master m ON i.master_id = m.master_id
+            WHERE i.quantity > 0 
+            ORDER BY i.expiry_date ASC";
+    $stmt = $pdo->query($sql);
+    $items = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error_message = "データがよめなかったよ: " . $e->getMessage();
+    $items = [];
 }
 ?>
 
@@ -83,139 +45,157 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>たべものをだす - Food Loss Buster</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .container { max-width: 800px; margin-top: 50px; }
-        .alert-near { background-color: #fff3cd; border-color: #ffeeba; } 
-        .text-danger-strong { color: #dc3545 !important; font-weight: bold; }
+        body { 
+            background-color: #fff9e6; 
+            font-family: 'Kiwi Maru', serif;
+            padding: 20px;
+        }
+
+        .main-board {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 40px;
+            border: 8px solid #ffc1c1; /* 「だす」はピンクの枠 */
+            box-shadow: 0 10px 0px #ffabab;
+            overflow: hidden;
+            padding-bottom: 20px;
+        }
+
+        .header-banner {
+            background-color: #ffc1c1;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+        }
+
+        .table thead th {
+            background-color: #fff0f0;
+            border-bottom: 3px solid #ffc1c1;
+            color: #555;
+        }
+
+        /* 食べ終わった時のボタン（おままごと風） */
+        .btn-eat {
+            background-color: #a0c4ff; /* 爽やかな水色 */
+            border: 3px solid #333;
+            border-radius: 20px;
+            padding: 15px;
+            font-weight: bold;
+            color: #333;
+            transition: all 0.2s;
+            box-shadow: 0 5px 0 #333;
+            font-size: 1.2rem;
+        }
+        .btn-eat:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 #333;
+            background-color: #8eb9ff;
+        }
+        .btn-eat:disabled {
+            background-color: #eee;
+            border-color: #ccc;
+            box-shadow: none;
+            color: #999;
+        }
+
+        .food-checkbox {
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+        }
+
+        .btn-back {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="mb-4 text-center">たべものをだす</h1>
-        <p class="text-center text-muted">使った分、捨てた分を記録しよう！</p>
-        
-        <?php if ($message): ?>
-            <div class="alert alert-success" role="alert"><?= htmlspecialchars($message) ?></div>
-        <?php endif; ?>
-        <?php if ($error_message): ?>
-            <div class="alert alert-danger" role="alert"><?= htmlspecialchars($error_message) ?></div>
-        <?php endif; ?>
 
-        <div class="alert alert-info">
-            「たべものなまえ」の横の「だす」ボタンを押して、使用量と状態を選んでね。
+    <div class="main-board">
+        <div class="header-banner">
+            🍴 たべものをだす
         </div>
 
-        <?php if (empty($items)): ?>
-            <p class="text-center">冷蔵庫の中は空っぽです。</p>
-        <?php else: ?>
+        <?php if (isset($message)): ?>
+            <div class="alert alert-success m-3">✨ <?= htmlspecialchars($message) ?></div>
+        <?php endif; ?>
+        <?php if (isset($error_message)): ?>
+            <div class="alert alert-danger m-3">⚠️ <?= htmlspecialchars($error_message) ?></div>
+        <?php endif; ?>
+
+        <form method="POST">
             <div class="table-responsive">
-                <table class="table table-striped mt-4">
+                <table class="table align-middle">
                     <thead>
                         <tr>
+                            <th class="text-center">だす</th>
                             <th>たべもの</th>
-                            <th>のこりかず</th>
-                            <th>のこり期限</th>
-                            <th>アクション</th>
+                            <th>のこり</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($items as $item): 
-                            $expiry_date = new DateTime($item['expiry_date']);
-                            $today = new DateTime();
-                            $interval = $today->diff($expiry_date);
-                            $days_remaining = (int)$interval->format('%R%a');
-                            $row_class = $days_remaining <= 7 ? 'alert-near' : '';
-                            $expiry_text = $days_remaining <= 0 ? '⚠️ 期限切れ' : 'あと' . $days_remaining . '日';
-                            $expiry_style = $days_remaining <= 7 ? 'class="text-danger-strong"' : '';
-                        ?>
-                        <tr class="<?= $row_class ?>">
-                            <td><?= htmlspecialchars($item['name']) ?></td>
-                            <td><?= htmlspecialchars($item['quantity'] . ' ' . $item['unit']) ?></td>
-                            <td <?= $expiry_style ?>><?= $expiry_text ?></td>
-                            <td>
-                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" 
-                                        data-bs-target="#removeModal" 
-                                        data-item-id="<?= $item['id'] ?>" 
-                                        data-item-name="<?= htmlspecialchars($item['name']) ?>"
-                                        data-item-unit="<?= htmlspecialchars($item['unit']) ?>"
-                                        data-max-quantity="<?= $item['quantity'] ?>">
-                                    だす
-                                </button>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
+                        <?php if (empty($items)): ?>
+                            <tr>
+                                <td colspan="3" class="text-center p-5">
+                                    れいぞうこは 空っぽだよ。
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($items as $item): ?>
+                            <tr>
+                                <td class="text-center">
+                                    <input type="checkbox" name="selected_items[]" 
+                                           value="<?= $item['id'] ?>" 
+                                           class="form-check-input food-checkbox">
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($item['name']) ?></strong><br>
+                                    <small class="text-muted"><?= htmlspecialchars($item['expiry_date']) ?> まで</small>
+                                </td>
+                                <td><?= htmlspecialchars($item['quantity'] . $item['unit']) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-        <?php endif; ?>
 
-        <div class="d-grid gap-2 mt-4">
-            <a href="top_refrigerator.php" class="btn btn-secondary">トップにもどる</a>
-        </div>
+            <div class="p-4">
+                <button type="submit" class="btn btn-eat w-100" id="eat_button" disabled>
+                    😋 たべたよ！
+                </button>
+                <div class="text-center">
+                    <a href="top_refrigerator.php" class="btn-back">トップにもどる</a>
+                </div>
+            </div>
+        </form>
     </div>
 
-    <div class="modal fade" id="removeModal" tabindex="-1" aria-labelledby="removeModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <form method="POST" action="putout_food.php" class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="removeModalLabel">たべものをだす</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="modal-item-name"></p>
-
-                    <div class="mb-3">
-                        <label for="quantity_to_remove" class="form-label">いくつだす？ (のこり: <span id="max-quantity-display"></span>)</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="quantity_to_remove" name="quantity_to_remove" min="1" required>
-                            <span class="input-group-text" id="modal-unit-display"></span>
-                        </div>
-                        <input type="hidden" name="item_id" id="modal-item-id">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">どうしたの？</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="status" id="statusUsed" value="Used" required checked>
-                            <label class="form-check-label" for="statusUsed">
-                                🍳 使いました（削減実績に貢献！）
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="status" id="statusWasted" value="Wasted">
-                            <label class="form-check-label" for="statusWasted">
-                                🗑️ 捨てました（食品ロスとして記録）
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                    <button type="submit" class="btn btn-danger">だす！</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var removeModal = document.getElementById('removeModal');
-            removeModal.addEventListener('show.bs.modal', function (event) {
-                var button = event.relatedTarget;
-                var itemId = button.getAttribute('data-item-id');
-                var itemName = button.getAttribute('data-item-name');
-                var itemUnit = button.getAttribute('data-item-unit');
-                var maxQuantity = button.getAttribute('data-max-quantity');
+        // チェックが入っている時だけボタンを押せるようにする
+        const checkboxes = document.querySelectorAll('.food-checkbox');
+        const eatButton = document.getElementById('eat_button');
 
-                removeModal.querySelector('#modal-item-name').textContent = itemName + ' をいくつだしますか？';
-                removeModal.querySelector('#modal-item-id').value = itemId;
-                removeModal.querySelector('#modal-unit-display').textContent = itemUnit;
-                removeModal.querySelector('#max-quantity-display').textContent = maxQuantity + ' ' + itemUnit;
-                var quantityInput = removeModal.querySelector('#quantity_to_remove');
-                quantityInput.max = maxQuantity;
-                quantityInput.value = maxQuantity;
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                const checkedCount = Array.from(checkboxes).filter(c => c.checked).length;
+                eatButton.disabled = checkedCount === 0;
+                if(checkedCount > 0) {
+                    eatButton.textContent = `😋 ${checkedCount}つ をたべたよ！`;
+                } else {
+                    eatButton.textContent = '😋 たべたよ！';
+                }
             });
         });
     </script>
