@@ -3,14 +3,7 @@ session_start();
 require_once 'db_config.php';
 $pdo = connectDB(); 
 
-$message = null;
-if (isset($_SESSION['message'])) {
-    $message = $_SESSION['message'];
-    unset($_SESSION['message']);
-}
-
-// 1. ロス削減実績の算出（db_config.phpに関数が定義されている前提です）
-// もしエラーが出る場合は、一旦 0 を代入するように書き換えてください
+// 1. ロス削減実績の算出
 $reduction_amount = 0; 
 if (function_exists('calculateMonthlyReduction')) {
     $reduction_amount = calculateMonthlyReduction($pdo); 
@@ -53,31 +46,43 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Food Loss Buster - TOP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <style>
-        body { background-color: #fff9e6; height: 100vh; margin: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: "Hiragino Sans", "Meiryo", sans-serif; position: relative; }
+        body {
+            background-color: #fff9e6;
+            background-image: radial-gradient(#d1e3ff 15%, transparent 15%), 
+                              radial-gradient(#d1e3ff 15%, transparent 15%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            font-family: 'Kiwi Maru', serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* 背景のはみ出し防止 */
+        }
         
-        /* 背景装飾 */
         .decorations { position: absolute; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
         .dot { position: absolute; border-radius: 50%; opacity: 0.5; }
         .floor { position: absolute; bottom: 0; width: 100%; height: 20vh; background: repeating-linear-gradient(to bottom, #d2b48c 0px, #d2b48c 2px, #e3c9a1 2px, #e3c9a1 40px); border-top: 2px solid #c9a67a; z-index: 0; }
 
         .main-scene { position: relative; z-index: 10; display: flex; align-items: center; gap: 30px; }
 
-        /* 冷蔵庫 */
         .fridge { width: 280px; height: 480px; background-color: #d1e3ff; border: 4px solid #333; border-radius: 50px 50px 30px 30px; position: relative; display: flex; flex-direction: column; box-shadow: 10px 10px 0px rgba(0,0,0,0.05); }
         .fridge::after { content: ""; position: absolute; top: 40%; left: 0; width: 100%; height: 4px; background-color: #333; }
         .handle { position: absolute; left: 15px; width: 50px; height: 12px; background-color: #a0c4ff; border: 3px solid #333; border-radius: 10px; }
         .handle-top { top: 30%; }
         .handle-bottom { top: 45%; }
 
-        /* ボタン */
         .btn-custom { background-color: #ffc1c1; border: 3px solid #333; border-radius: 15px; padding: 15px 25px; font-weight: bold; color: #333; text-decoration: none; display: inline-block; transition: all 0.2s; box-shadow: 0 4px 0 #333; text-align: center; min-width: 180px; }
         .btn-custom:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #333; background-color: #ffadad; color: #333; }
         .btn-custom:active { transform: translateY(2px); box-shadow: 0 0px 0 #333; }
         .btn-inside { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 80%; }
 
-        /* 吹き出しのアニメーション */
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-10px); }
@@ -98,7 +103,6 @@ try {
             z-index: 20;
             animation: bounce 2s infinite;
         }
-        /* 吹き出しのしっぽ */
         .bubble::after {
             content: "";
             position: absolute;
@@ -151,5 +155,20 @@ try {
         <div><a href="putout_food.php" class="btn-custom">たべものをだす</a></div>
     </div>
 
+    <script>
+        // PHPからセッションメッセージがあるか確認してポップアップを表示
+        <?php if (isset($_SESSION['message'])): ?>
+            Swal.fire({
+                title: 'やったね！',
+                text: '<?= $_SESSION['message'] ?>',
+                icon: 'success',
+                confirmButtonText: 'おっけー！',
+                confirmButtonColor: '#ffcc80',
+                background: '#fffdf0',
+                borderRadius: '30px'
+            });
+            <?php unset($_SESSION['message']); ?>
+        <?php endif; ?>
+    </script>
 </body>
 </html>
