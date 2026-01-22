@@ -3,14 +3,14 @@ session_start();
 require_once 'db_config.php';
 $pdo = connectDB(); 
 
-// 1. ロス削減実績の算出
+// ロス削減実績の算出
 $reduction_amount = 0; 
 if (function_exists('calculateMonthlyReduction')) {
     $reduction_amount = calculateMonthlyReduction($pdo); 
 }
 $reduction_text = number_format($reduction_amount); 
 
-// 2. 優先消費提案（一番期限が近いもの1つ）
+// 優先消費提案（一番期限が近いもの1つ）
 $closest_food_name = '';
 try {
     $sql = "SELECT m.name 
@@ -29,7 +29,7 @@ try {
     $closest_food_name = 'エラー';
 }
 
-// 3. 期限まであと3日以内の食材の数を取得
+// 期限まであと3日以内の食材の数を取得
 $alert_count = 0;
 try {
     $sql = "SELECT COUNT(*) FROM food_items WHERE quantity > 0 AND expiry_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY)";
@@ -156,7 +156,7 @@ try {
     </div>
 
     <script>
-        // PHPからセッションメッセージがあるか確認してポップアップを表示
+        // ポップアップを表示
         <?php if (isset($_SESSION['message'])): ?>
             Swal.fire({
                 title: 'やったね！',

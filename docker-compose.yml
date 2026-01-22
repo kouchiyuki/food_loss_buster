@@ -1,55 +1,46 @@
 version: '3.8'
 
 services:
-  # 1. アプリケーションサーバー (PHP + Apache)
+ 
   app:
-    build: .  # ★★★ ここを追加：カレントディレクトリのDockerfileを使ってビルドする
+    build: . 
     container_name: food-loss-app
     volumes:
-      # プロジェクトフォルダのルート（Web公開するファイル）をコンテナのWebルートにマウント
       - ./:/var/www/html
-      # ★★★ ここを追加 ★★★
       - ./000-default.conf:/etc/apache2/sites-available/000-default.conf
     ports:
-      # ホスト側の8080ポートをコンテナ側の80ポートにマッピング
       - "8080:80"
     depends_on:
       - db
-    # コンテナのユーザーをホストと同じにする設定（パーミッションエラーを防ぐ）
     user: "${UID:-1000}:${GID:-1000}" 
     environment:
-      # 環境変数（必要に応じて）
       TZ: Asia/Tokyo
 
-  # 2. データベースサーバー (MariaDB)
   db:
     image: mariadb:latest
     container_name: food-loss-db
     environment:
-      # データベース接続情報 (開発用)
-      MYSQL_ROOT_PASSWORD: root_secret_password # ルートパスワード
-      MYSQL_DATABASE: refrigerator_db           # データベース名
+      MYSQL_ROOT_PASSWORD: root_secret_password
+      MYSQL_DATABASE: refrigerator_db
       MYSQL_USER: user_name
       MYSQL_PASSWORD: user_secret_password
       TZ: Asia/Tokyo
     volumes:
-      # データベースのデータを永続化するためのボリューム
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "3306:3306" # 外部からのDB接続用にポートを公開
+      - "3306:3306"
 
-  # 3. データベース管理ツール (phpMyAdmin)
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     container_name: food-loss-admin
     environment:
-      PMA_HOST: db # データベースサービスのホスト名（重要）
+      PMA_HOST: db
       PMA_PORT: 3306
       MYSQL_ROOT_PASSWORD: root_secret_password
       TZ: Asia/Tokyo
     ports:
-      - "8081:80" # ホスト側の8081ポートでアクセス可能にする
+      - "8081:80"
 
 volumes:
-  db_data: # 永続化ボリュームの定義
+  db_data:

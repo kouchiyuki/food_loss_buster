@@ -15,7 +15,6 @@ try {
     exit("マスターデータ取得エラー: " . $e->getMessage());
 }
 
-// POSTリクエストの処理
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $food_name = filter_input(INPUT_POST, 'food_name');
     $quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
@@ -26,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
 
-            // 1. 食材名から master_id を取得
+            //食材名から master_id を取得
             $stmt_id = $pdo->prepare("SELECT master_id FROM food_master WHERE name = :name");
             $stmt_id->execute([':name' => $food_name]);
             $result = $stmt_id->fetch();
@@ -46,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $master_id = $pdo->lastInsertId();
             }
 
-            // 2. 在庫登録
+            // 在庫登録
             $stmt = $pdo->prepare("INSERT INTO food_items (master_id, quantity, expiry_date) VALUES (:master_id, :quantity, :expiry_date)");
             $stmt->execute([
                 ':master_id' => $master_id,
@@ -89,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 0 auto;
             background: white;
             border-radius: 40px;
-            border: 8px solid #ffcc80; /* 「いれる」はオレンジの枠 */
+            border: 8px solid #ffcc80;
             box-shadow: 0 10px 0px #ffb74d;
             overflow: hidden;
             padding-bottom: 20px;
@@ -111,7 +110,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-top: 10px;
         }
 
-        /* 入力欄を丸く可愛く */
         .form-control {
             border: 3px solid #ffe0b2;
             border-radius: 15px;
@@ -123,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: none;
         }
 
-        /* 登録ボタン（おままごと風） */
+        /* 登録ボタン*/
         .btn-submit {
             background-color: #ffcc80;
             border: 3px solid #333;

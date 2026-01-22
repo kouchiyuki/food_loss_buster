@@ -1,13 +1,9 @@
--- =========================
 -- Food Loss Buster 初期化SQL
--- =========================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- =========================
--- 1. 食材マスタ
--- =========================
+-- 食材マスタ
 CREATE TABLE IF NOT EXISTS food_master (
   master_id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -16,9 +12,7 @@ CREATE TABLE IF NOT EXISTS food_master (
   price_per_unit INT NOT NULL COMMENT '1単位あたりの概算価格'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- =========================
--- 2. 冷蔵庫の在庫
--- =========================
+-- 冷蔵庫の在庫
 CREATE TABLE IF NOT EXISTS food_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   master_id INT NOT NULL,
@@ -31,9 +25,7 @@ CREATE TABLE IF NOT EXISTS food_items (
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- =========================
--- 3. 使用・廃棄ログ
--- =========================
+-- 使用・廃棄ログ
 CREATE TABLE IF NOT EXISTS waste_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   food_item_id INT NOT NULL,
@@ -48,9 +40,8 @@ CREATE TABLE IF NOT EXISTS waste_log (
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- =========================
--- 初期マスタデータ（最低限）
--- =========================
+
+-- 初期マスタデータ
 INSERT INTO food_master (name, unit, category, price_per_unit) VALUES
 ('にんじん', '本', '野菜', 50),
 ('たまねぎ', '個', '野菜', 40),

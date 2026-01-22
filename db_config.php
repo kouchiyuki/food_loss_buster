@@ -7,7 +7,7 @@ define('DB_NAME', 'refrigerator_db');
 
 /**
  * データベースへの接続を行う関数
- * @return PDO 接続オブジェクト
+ * @return PDO 
  */
 function connectDB(): PDO {
     try {
@@ -25,15 +25,12 @@ function connectDB(): PDO {
 }
 
 /**
- * 今月の食品ロス削減実績（金額）を算出する関数
- * ※ ここでは Wasted ではなく Used が減らされた量を算出する想定
  * @param PDO $pdo データベース接続オブジェクト
  * @return float 削減金額の合計
  */
 function calculateMonthlyReduction(PDO $pdo): float {
     $yearMonth = date('Y-m');
     
-    // SQL: 今月 Used の量を food_master の単価と掛けて合計
     $sql = "SELECT 
                 SUM(wl.quantity * fm.price_per_unit) AS total_reduction
             FROM waste_log wl
@@ -49,8 +46,3 @@ function calculateMonthlyReduction(PDO $pdo): float {
 
     return (float)($result['total_reduction'] ?? 0);
 }
-
-// 使用例
-// $pdo = connectDB();
-// $reduction = calculateMonthlyReduction($pdo);
-// echo "今月の削減金額: " . number_format($reduction) . "円";

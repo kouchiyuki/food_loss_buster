@@ -43,7 +43,7 @@ try {
             margin: 0 auto;
             background: white;
             border-radius: 40px;
-            border: 8px solid #a0c4ff; /* 冷蔵庫の水色 */
+            border: 8px solid #a0c4ff;
             box-shadow: 0 10px 0px #8eb9ff;
             overflow: hidden;
             padding-bottom: 20px;
@@ -75,7 +75,7 @@ try {
         .expired { background-color: #ffe5e5 !important; }
         .alert-near { background-color: #fff8e1 !important; }
 
-        /* チェックボックスを少し大きく */
+        /* チェックボックス*/
         .food-checkbox {
             width: 20px;
             height: 20px;
@@ -88,7 +88,7 @@ try {
             font-weight: bold;
         }
 
-        /* レシピボタン（おままごと風） */
+        /* レシピボタン*/
         .btn-recipe {
             background-color: #ffc1c1;
             border: 3px solid #333;

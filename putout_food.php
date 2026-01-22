@@ -156,7 +156,7 @@ try {
                 const hasValue = Array.from(inputs).some(i => parseInt(i.value) > 0);
                 eatButton.disabled = !hasValue;
                 
-                // 入力された合計数をボタンに表示（おまけ機能）
+                // 入力された合計数をボタンに表示
                 const totalUsed = Array.from(inputs).reduce((sum, i) => sum + parseInt(i.value || 0), 0);
                 if(totalUsed > 0) {
                     eatButton.textContent = `😋 ${totalUsed}つ たべたよ！`;
