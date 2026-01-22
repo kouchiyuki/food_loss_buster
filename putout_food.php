@@ -75,27 +75,56 @@ try {
     <style>
         body { background-color: #fff9e6; font-family: 'Kiwi Maru', serif; padding: 20px; }
         .main-board {
-            max-width: 700px; margin: 0 auto; background: white;
-            border-radius: 40px; border: 8px solid #ffc1c1;
-            box-shadow: 0 10px 0px #ffabab; overflow: hidden;
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white;
+            border-radius: 40px; 
+            border: 8px solid #ffc1c1;
+            box-shadow: 0 10px 0px #ffabab; 
+            overflow: hidden;
         }
         .header-banner {
-            background-color: #ffc1c1; color: white; padding: 20px;
-            text-align: center; font-size: 1.5rem; font-weight: bold;
+            background-color: #ffc1c1; 
+            color: white; padding: 20px;
+            text-align: center; 
+            font-size: 1.5rem; 
+            font-weight: bold;
         }
-        .food-card { border-bottom: 2px dashed #eee; padding: 15px; }
-        
+        .food-card { 
+            border-bottom: 2px dashed #eee; 
+            padding: 10px 15px;
+            margin: 0 10px;
+         }
+        .food-name { 
+            font-size: 0.95rem; 
+            font-weight: bold; 
+        }
+        .food-info { 
+            font-size: 0.8rem; 
+            color: #666; 
+        }
         /* 廃棄ボタン*/
         .btn-waste {
-            background-color: #5D4037; color: #D7CCC8; border: 2px solid #3E2723;
-            font-size: 0.8rem; border-radius: 10px; padding: 5px 10px;
+            background-color: #5D4037; 
+            color: #D7CCC8; 
+            border: 2px solid #3E2723;
+            font-size: 0.75rem; 
+            border-radius: 8px; 
+            padding: 4px 8px;
+            box-shadow: 0 3px 0 #3E2723;
         }
         .btn-waste:hover { background-color: #3E2723; color: white; }
         
         /* たべれたよ！ボタン */
         .btn-eat {
-            background-color: #ffca28; color: #5D4037; border: 2px solid #ff8f00;
-            font-weight: bold; border-radius: 10px; padding: 8px 15px;
+            background-color: #ffca28; 
+            color: #5D4037; 
+            border: 2px solid #ff8f00;
+            font-size: 0.75rem;
+            font-weight: bold; 
+            border-radius: 8px; 
+            padding: 4px 8px;
+            box-shadow: 0 3px 0 #ff8f00;
         }
         .btn-eat:hover { background-color: #ffb300; }
 
@@ -124,7 +153,7 @@ try {
                     <div>
                         <span class="fs-5 fw-bold"><?= htmlspecialchars($item['name']) ?></span>
                         <span class="badge bg-info text-dark ms-2"><?= htmlspecialchars($item['quantity'] . $item['unit']) ?></span>
-                        <div class="text-muted small">しめきり: <?= htmlspecialchars($item['expiry_date']) ?></div>
+                        <div class="text-muted small">きげん: <?= htmlspecialchars($item['expiry_date']) ?></div>
                     </div>
 
                     <div class="text-end">
