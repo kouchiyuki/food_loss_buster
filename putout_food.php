@@ -74,13 +74,11 @@ $today = new DateTime();
             background-color: #ffc1c1; color: white; padding: 20px;
             text-align: center; font-size: 1.5rem; font-weight: bold;
         }
-        
-        /* --- 追加した「茶色」の装飾 --- */
         .urgent-danger {
-            border: 4px solid #3E2723 !important; /* どす黒い茶色 */
-            background-color: #D7CCC8 !important; /* 濁った背景 */
+            border: 4px solid #3E2723 !important;
+            background-color: #D7CCC8 !important;
             box-shadow: inset 0 0 8px #3E2723;
-            border-radius: 15px; /* 枠線を綺麗に見せる */
+            border-radius: 15px;
         }
         .urgent-text { color: #3E2723 !important; font-weight: bold; }
 
