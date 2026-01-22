@@ -3,14 +3,22 @@ session_start();
 require_once 'db_config.php';
 $pdo = connectDB(); 
 
-// ロス削減実績の算出
-$reduction_amount = 0; 
-if (function_exists('calculateMonthlyReduction')) {
-    $reduction_amount = calculateMonthlyReduction($pdo); 
+// --- ロス削減実績の算出---
+$total_saved = 0;
+try {
+    // 'Used'のものの数量を今月分だけ合計
+    $sql_saved = "SELECT SUM(quantity) as total 
+                  FROM waste_log 
+                  WHERE status = 'Used' 
+                  AND logged_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+    $stmt_saved = $pdo->query($sql_saved);
+    $saved_data = $stmt_saved->fetch();
+    $total_saved = (int)($saved_data['total'] ?? 0);
+} catch (PDOException $e) {
+    $total_saved = 0;
 }
-$reduction_text = number_format($reduction_amount); 
 
-// 優先消費提案（一番期限が近いもの1つ）
+// --- 優先消費提案 ---
 $closest_food_name = '';
 try {
     $sql = "SELECT m.name 
@@ -29,7 +37,7 @@ try {
     $closest_food_name = 'エラー';
 }
 
-// 期限まであと3日以内の食材の数を取得
+// --- 期限まであと3日以内の食材の数を取得 ---
 $alert_count = 0;
 try {
     $sql = "SELECT COUNT(*) FROM food_items WHERE quantity > 0 AND expiry_date BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 3 DAY)";
@@ -37,6 +45,17 @@ try {
     $alert_count = $stmt->fetchColumn();
 } catch (PDOException $e) {
     $alert_count = 0;
+}
+
+// --- 冷蔵庫のセリフを生成 ---
+if ($alert_count > 0) {
+    $fridge_talk = "⏰ <strong>あと{$alert_count}こ！</strong><br><small>" . htmlspecialchars($closest_food_name) . " を<br>はやくたべよう！</small>";
+} elseif ($total_saved > 0) {
+    $fridge_talk = "✨ <strong>すごーい！</strong><br><small>今月は {$total_saved}こも<br>たすけてくれたよ！</small>";
+} elseif ($closest_food_name) {
+    $fridge_talk = "😊 <strong>じゅんびOK</strong><br><small>次は " . htmlspecialchars($closest_food_name) . "<br>をたべようね！</small>";
+} else {
+    $fridge_talk = "✨ <strong>からっぽだよ</strong><br><small>なにかいれる？</small>";
 }
 ?>
 
@@ -58,70 +77,54 @@ try {
             background-size: 20px 20px;
             background-position: 0 0, 10px 10px;
             font-family: 'Kiwi Maru', serif;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden; /* 背景のはみ出し防止 */
+            margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden;
         }
         
-        .decorations { position: absolute; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-        .dot { position: absolute; border-radius: 50%; opacity: 0.5; }
         .floor { position: absolute; bottom: 0; width: 100%; height: 20vh; background: repeating-linear-gradient(to bottom, #d2b48c 0px, #d2b48c 2px, #e3c9a1 2px, #e3c9a1 40px); border-top: 2px solid #c9a67a; z-index: 0; }
 
         .main-scene { position: relative; z-index: 10; display: flex; align-items: center; gap: 30px; }
 
-        .fridge { width: 280px; height: 480px; background-color: #d1e3ff; border: 4px solid #333; border-radius: 50px 50px 30px 30px; position: relative; display: flex; flex-direction: column; box-shadow: 10px 10px 0px rgba(0,0,0,0.05); }
+        /* 冷蔵庫のデザイン */
+        .fridge { 
+            width: 280px; height: 480px; background-color: #d1e3ff; border: 4px solid #333; 
+            border-radius: 50px 50px 30px 30px; position: relative; display: flex; flex-direction: column; 
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.05); 
+        }
         .fridge::after { content: ""; position: absolute; top: 40%; left: 0; width: 100%; height: 4px; background-color: #333; }
         .handle { position: absolute; left: 15px; width: 50px; height: 12px; background-color: #a0c4ff; border: 3px solid #333; border-radius: 10px; }
         .handle-top { top: 30%; }
         .handle-bottom { top: 45%; }
 
-        .btn-custom { background-color: #ffc1c1; border: 3px solid #333; border-radius: 15px; padding: 15px 25px; font-weight: bold; color: #333; text-decoration: none; display: inline-block; transition: all 0.2s; box-shadow: 0 4px 0 #333; text-align: center; min-width: 180px; }
-        .btn-custom:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #333; background-color: #ffadad; color: #333; }
-        .btn-custom:active { transform: translateY(2px); box-shadow: 0 0px 0 #333; }
+        /* 実績表示パネル*/
+        .stats-panel {
+            position: absolute; top: -70px; left: 50%; transform: translateX(-50%);
+            background: #ffca28; border: 3px solid #333; border-radius: 15px;
+            padding: 5px 15px; white-space: nowrap; font-weight: bold; font-size: 0.9rem;
+            box-shadow: 0 4px 0 #333;
+        }
+
+        .btn-custom { 
+            background-color: #ffc1c1; border: 3px solid #333; border-radius: 15px; padding: 15px 25px; 
+            font-weight: bold; color: #333; text-decoration: none; display: inline-block; 
+            transition: all 0.2s; box-shadow: 0 4px 0 #333; text-align: center; min-width: 180px; 
+        }
+        .btn-custom:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #333; background-color: #ffadad; }
         .btn-inside { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 80%; }
 
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
         .bubble {
-            position: absolute;
-            top: 60px;
-            right: -60px;
-            background: white;
-            padding: 12px;
-            border-radius: 20px;
-            border: 3px solid #333;
-            font-size: 14px;
-            box-shadow: 5px 5px 0 rgba(0,0,0,0.1);
-            text-align: center;
-            min-width: 130px;
-            z-index: 20;
-            animation: bounce 2s infinite;
+            position: absolute; top: 60px; right: -80px; background: white; padding: 12px; 
+            border-radius: 20px; border: 3px solid #333; font-size: 14px; box-shadow: 5px 5px 0 rgba(0,0,0,0.1);
+            text-align: center; min-width: 150px; z-index: 20; animation: bounce 2s infinite;
         }
         .bubble::after {
-            content: "";
-            position: absolute;
-            left: -15px;
-            top: 20px;
-            border-width: 8px 15px 8px 0;
-            border-style: solid;
-            border-color: transparent white transparent transparent;
+            content: ""; position: absolute; left: -15px; top: 20px;
+            border-width: 8px 15px 8px 0; border-style: solid; border-color: transparent white transparent transparent;
         }
     </style>
 </head>
 <body>
-
-    <div class="decorations">
-        <div class="dot" style="width:20px; height:20px; background:#ffcfcf; left:10%; top:20%;"></div>
-        <div class="dot" style="width:15px; height:15px; background:#d4f1f9; left:80%; top:15%;"></div>
-        <div class="dot" style="width:25px; height:25px; background:#fdf9c4; left:20%; top:70%;"></div>
-        <div class="dot" style="width:18px; height:18px; background:#e0f9d4; left:85%; top:60%;"></div>
-    </div>
 
     <div class="floor"></div>
 
@@ -129,25 +132,14 @@ try {
         <div><a href="insert_food.php" class="btn-custom">たべものをいれる</a></div>
 
         <div class="fridge">
+            <div class="stats-panel">🏆 今月救った数: <?= $total_saved ?>こ</div>
+
             <div class="handle handle-top"></div>
             <div class="handle handle-bottom"></div>
             
-            <?php if ($alert_count > 0): ?>
-                <div class="bubble">
-                    ⏰ <strong>あと<?= $alert_count ?>こ！</strong><br>
-                    <small><?= htmlspecialchars($closest_food_name) ?> を<br>はやくたべよう！</small>
-                </div>
-            <?php elseif ($closest_food_name): ?>
-                <div class="bubble" style="animation: none;">
-                    😊 <strong>いまのところOK</strong><br>
-                    <small>次は <?= htmlspecialchars($closest_food_name) ?><br>だね！</small>
-                </div>
-            <?php else: ?>
-                <div class="bubble" style="animation: none;">
-                    ✨ <strong>からっぽだよ</strong><br>
-                    <small>なにかいれる？</small>
-                </div>
-            <?php endif; ?>
+            <div class="bubble">
+                <?= $fridge_talk ?>
+            </div>
 
             <a href="look_inside_refrigerato.php" class="btn-custom btn-inside">なかをみる</a>
         </div>
@@ -156,11 +148,11 @@ try {
     </div>
 
     <script>
-        // ポップアップを表示
+        // 登録・削除完了時のメッセージ
         <?php if (isset($_SESSION['message'])): ?>
             Swal.fire({
                 title: 'やったね！',
-                text: '<?= $_SESSION['message'] ?>',
+                text: '<?= htmlspecialchars($_SESSION['message']) ?>',
                 icon: 'success',
                 confirmButtonText: 'おっけー！',
                 confirmButtonColor: '#ffcc80',
