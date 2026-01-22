@@ -57,6 +57,10 @@ if ($alert_count > 0) {
 } else {
     $fridge_talk = "✨ <strong>からっぽだよ</strong><br><small>なにかいれる？</small>";
 }
+
+if (empty($closest_food_name)) {
+    $fridge_talk = "✨ <strong>ぴっかぴか！</strong><br><small>ぜんぶ たべたんだね！<br>はなまるだよ💮</small>";
+}
 ?>
 
 <!DOCTYPE html>
