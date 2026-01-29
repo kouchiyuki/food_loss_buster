@@ -6,7 +6,6 @@ $pdo = connectDB();
 // --- ロス削減実績の算出---
 $total_saved = 0;
 try {
-    // 'Used'のものの数量を今月分だけ合計
     $sql_saved = "SELECT SUM(quantity) as total 
                   FROM waste_log 
                   WHERE status = 'Used' 
@@ -61,6 +60,10 @@ if ($alert_count > 0) {
 if (empty($closest_food_name)) {
     $fridge_talk = "✨ <strong>ぴっかぴか！</strong><br><small>ぜんぶ たべたんだね！<br>はなまるだよ💮</small>";
 }
+
+// --- モーダル表示用フラグ ---
+$show_modal = ($alert_count > 0);
+$modal_message = $show_modal ? "⏰ <strong>あと{$alert_count}こ！</strong><br><small>" . htmlspecialchars($closest_food_name) . " をはやくたべよう！</small>" : '';
 ?>
 
 <!DOCTYPE html>
@@ -71,6 +74,7 @@ if (empty($closest_food_name)) {
     <title>Food Loss Buster - TOP</title>
     <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
@@ -151,6 +155,24 @@ if (empty($closest_food_name)) {
         <div><a href="putout_food.php" class="btn-custom">たべものをだす</a></div>
     </div>
 
+    <!-- AIレシピ提案モーダル -->
+    <div class="modal fade" id="aiRecipeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">⏰ 食材の期限が近いよ！</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+          </div>
+          <div class="modal-body">
+            <?= $modal_message ?>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
         // 登録・削除完了時のメッセージ
         <?php if (isset($_SESSION['message'])): ?>
@@ -164,6 +186,14 @@ if (empty($closest_food_name)) {
                 borderRadius: '30px'
             });
             <?php unset($_SESSION['message']); ?>
+        <?php endif; ?>
+
+        // ページロード時に期限が近い食材があればモーダル表示
+        <?php if ($show_modal): ?>
+            window.addEventListener('DOMContentLoaded', () => {
+                const modal = new bootstrap.Modal(document.getElementById('aiRecipeModal'));
+                modal.show();
+            });
         <?php endif; ?>
     </script>
 </body>
