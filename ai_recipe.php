@@ -2,7 +2,7 @@
 session_start();
 require_once 'db_config.php';
 
-// OpenAI APIキー（.envや環境変数で設定）
+// OpenAI APIキー（.envや環境変数から安全に取得）
 $OPENAI_API_KEY = getenv('OPENAI_API_KEY');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_POST['selected_foods'])) {
@@ -10,7 +10,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_POST['selected_foods'])) {
     exit;
 }
 
-$selected_foods = $_POST['selected_foods'];
+$selected_foods = array_filter($_POST['selected_foods'], fn($v) => !empty(trim($v)));
+if (empty($selected_foods)) {
+    $_SESSION['message'] = '食材を1つ以上入力してください。';
+    header('Location: look_inside_refrigerato.php');
+    exit;
+}
+
 $food_list = implode('、', $selected_foods);
 
 // AIへのプロンプト
@@ -30,7 +36,7 @@ $data = [
         ["role" => "system", "content" => "あなたは親切で家庭向けの料理アシスタントです。"],
         ["role" => "user", "content" => $prompt]
     ],
-    "max_tokens" => 500,
+    "max_tokens" => 700,
     "temperature" => 0.7
 ];
 
@@ -42,7 +48,7 @@ $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $error_msg = curl_error($ch);
 curl_close($ch);
 
-// エラーハンドリング
+// レシピ取得結果の判定
 if ($error_msg) {
     $ai_result = "AIに接続できませんでした: {$error_msg}";
 } elseif ($http_code == 429) {
@@ -51,7 +57,11 @@ if ($error_msg) {
     $ai_result = "AIに接続できませんでした。HTTPコード: {$http_code}";
 } else {
     $res_json = json_decode($response, true);
-    $ai_result = $res_json['choices'][0]['message']['content'] ?? "レシピを取得できませんでした。";
+    if (isset($res_json['choices'][0]['message']['content'])) {
+        $ai_result = $res_json['choices'][0]['message']['content'];
+    } else {
+        $ai_result = "レシピを取得できませんでした。";
+    }
 }
 ?>
 
@@ -84,7 +94,7 @@ pre { background-color: #f0f7ff; padding: 15px; border-radius: 10px; white-space
         <pre><?= htmlspecialchars($ai_result) ?></pre>
     <?php endif; ?>
 
-    <a href="look_inside_refrigerato.php" class="btn btn-primary btn-back">もどる</a>
+    <a href="top_refrigerator.php" class="btn btn-primary btn-back">トップにもどる</a>
 </div>
 </body>
 </html>
