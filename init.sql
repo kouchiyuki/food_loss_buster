@@ -49,7 +49,7 @@ INSERT INTO food_master (name, unit, category, price_per_unit) VALUES
 ('鶏むね肉', 'g', '肉', 1),
 ('豚こま肉', 'g', '肉', 1),
 ('卵', '個', '卵', 30),
-('牛乳', 'ml', '乳製品', 0.2)
+('牛乳', 'ml', '乳製品', 2),
 ('キャベツ', '玉', '野菜', 200),
 ('白菜', '玉', '野菜', 300),
 ('ブロッコリー', 'こ', '野菜', 150),
@@ -61,4 +61,3 @@ INSERT INTO food_master (name, unit, category, price_per_unit) VALUES
 ('マヨネーズ', '本', '調味料', 300),
 ('ケチャップ', '本', '調味料', 300),
 ('食パン', '枚', 'パン', 30);
-ON DUPLICATE KEY UPDATE name = name;
