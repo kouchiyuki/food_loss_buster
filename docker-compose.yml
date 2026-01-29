@@ -14,7 +14,9 @@ services:
       - db
     user: "${UID:-1000}:${GID:-1000}" 
     environment:
-      TZ: Asia/Tokyo
+      - TZ=Asia/Tokyo
+    env_file:
+      - ./.env
 
   db:
     image: mariadb:latest

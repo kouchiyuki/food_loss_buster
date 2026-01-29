@@ -159,7 +159,8 @@ try {
             </div>
 
             <div class="p-4">
-                <button type="submit" class="btn btn-recipe w-100" id="search_button" disabled>食材をえらんでね</button>
+                <button type="button" class="btn btn-recipe" id="btn_cookpad" disabled>Cookpadでレシピを探す</button>
+                <button type="button" class="btn btn-recipe btn-warning" id="btn_ai" disabled>AIにおすすめ料理を聞く</button>
                 <div class="text-center">
                     <a href="top_refrigerator.php" class="btn-back">トップにもどる</a>
                 </div>
@@ -170,30 +171,50 @@ try {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const checkboxes = document.querySelectorAll('.food-checkbox');
-            const searchButton = document.getElementById('search_button');
-            const form = document.getElementById('recipe_search_form');
+            const btnCookpad = document.getElementById('btn_cookpad');
+            const btnAI = document.getElementById('btn_ai');
 
             const updateButtonState = () => {
                 const checkedFoods = Array.from(checkboxes).filter(cb => cb.checked);
                 const count = checkedFoods.length;
                 if (count > 0) {
-                    searchButton.disabled = false;
-                    searchButton.textContent = `✅ ${count}つの食材でレシピ提案！`;
+                    btnCookpad.disabled = false;
+                    btnAI.disabled = false;
+                    btnCookpad.textContent = `✅ ${count}つの食材でCookpad検索`;
+                    btnAI.textContent = `🤖 ${count}つの食材でAIに聞く`;
                 } else {
-                    searchButton.disabled = true;
-                    searchButton.textContent = '食材をえらんでね';
+                    btnCookpad.disabled = true;
+                    btnAI.disabled = true;
+                    btnCookpad.textContent = '食材をえらんでね';
+                    btnAI.textContent = '食材をえらんでね';
                 }
             };
 
             checkboxes.forEach(cb => { cb.addEventListener('change', updateButtonState); });
-
-            form.addEventListener('submit', function(event) {
-                const checkedFoods = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-                if (checkedFoods.length === 0) { event.preventDefault(); return; }
-                const queryString = checkedFoods.join(' ');
-                this.action = `https://cookpad.com/search/${encodeURIComponent(queryString)}`;
-            });
             updateButtonState();
+
+            btnCookpad.addEventListener('click', () => {
+            const checkedFoods = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+            const queryString = encodeURIComponent(checkedFoods.join(' '));
+            window.open(`https://cookpad.com/search/${queryString}`, '_blank');
+            });
+
+            btnAI.addEventListener('click', () => {
+                const checkedFoods = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+                // 選択した食材をPOSTでAI処理用PHPに送る
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'ai_recipe.php'; // 新規作成するAI用PHP
+                checkedFoods.forEach(food => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_foods[]';
+                    input.value = food;
+                    form.appendChild(input);
+                });
+                document.body.appendChild(form);
+                form.submit();
+            });
         });
     </script>
 </body>
